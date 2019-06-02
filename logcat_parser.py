@@ -23,7 +23,7 @@ python logcat_parser.py <path_to_logcat_file> -s
 from sys import exit
 from os import path
 from argparse import ArgumentParser
-from re import compile, error
+from re import compile, error, IGNORECASE
 from datetime import datetime
 
 
@@ -53,7 +53,14 @@ def _get_timestamp_from_line(line):
         return datetime.strptime(timestamp_string, timestamp_pattern)
     except (AttributeError, error):
         print(f'Timestamp at line "{line.rstrip()}" is not in correct format: {timestamp_pattern}')
-        exit(3)
+        exit(4)
+
+
+def _get_index(items_list, index):
+    try:
+        return items_list[index]
+    except (IndexError, TypeError):
+        return None
 
 
 def _get_test_duration(file_path):
@@ -72,13 +79,13 @@ def _get_test_duration(file_path):
                 return 0
 
     print('No "TEST STARTED" and/or "TEST FINISHED" text sequences in log file.')
-    return 4
+    return 5
 
 
 def _get_log_lines(file_path, included_words, excluded_words):
     log_lines = list()
-    re_included_words = [compile(word) for word in included_words] if included_words else []
-    re_excluded_words = [compile(word) for word in excluded_words] if excluded_words else []
+    re_included_words = [compile(word, IGNORECASE) for word in included_words] if included_words else []
+    re_excluded_words = [compile(word, IGNORECASE) for word in excluded_words] if excluded_words else []
     all_excluded = True
 
     with open(file_path, 'r') as logfile:
@@ -93,7 +100,7 @@ def _get_log_lines(file_path, included_words, excluded_words):
                     all_excluded = False
                     break
 
-            if all_excluded:
+            if all_excluded and excluded_words and _get_index(log_lines, -1) != line:
                 log_lines.append(line)
             all_excluded = True
 
@@ -111,6 +118,10 @@ def main():
     if not path.exists(args.path):
         print(f'Desired path "{args.path}" does not exist.')
         return 2
+
+    if not (args.include or args.exclude or args.test_duration):
+        print(f'Please choose at least one option. See -h for help.')
+        return 3
 
     if args.test_duration:
         return _get_test_duration(args.path)
